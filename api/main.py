@@ -1,5 +1,6 @@
 import os
 
+import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -57,3 +58,7 @@ def liberar_plaza(plaza_id: int):
     if not respuesta.data:
         raise HTTPException(status_code=404, detail="Plaza no encontrada")
     return respuesta.data[0]
+
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))
