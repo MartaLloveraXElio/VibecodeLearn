@@ -77,9 +77,25 @@ class GarageApi {
     }
     if (respuesta.statusCode >= 400) {
       throw GarageApiException(
-        'El servidor respondió con un error (${respuesta.statusCode}).',
+        'El servidor respondió con un error (${respuesta.statusCode}): '
+        '${_detalleDelError(respuesta)}',
       );
     }
     return parsear(respuesta);
+  }
+
+  /// FastAPI devuelve los errores como `{"detail": "..."}`. Si el cuerpo no
+  /// tiene ese formato (por ejemplo, una página de error de Render en vez
+  /// de una respuesta de nuestra API), se muestra el texto tal cual.
+  String _detalleDelError(http.Response respuesta) {
+    try {
+      final cuerpo = jsonDecode(respuesta.body);
+      if (cuerpo is Map<String, dynamic> && cuerpo['detail'] != null) {
+        return cuerpo['detail'].toString();
+      }
+    } catch (_) {
+      // El cuerpo no era JSON válido; se usa tal cual más abajo.
+    }
+    return respuesta.body;
   }
 }
