@@ -1,3 +1,4 @@
+import logging
 import os
 
 import uvicorn
@@ -8,6 +9,8 @@ from pydantic import BaseModel
 from supabase import create_client, Client
 
 load_dotenv()
+
+logger = logging.getLogger("garaje_api")
 
 supabase: Client = create_client(
     os.environ["SUPABASE_URL"],
@@ -41,6 +44,7 @@ def _ejecutar(consulta):
     try:
         return consulta.execute()
     except Exception as error:
+        logger.exception("Fallo al consultar Supabase")
         raise HTTPException(status_code=502, detail=str(error)) from error
 
 
