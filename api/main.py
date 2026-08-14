@@ -28,19 +28,34 @@ class OcuparBody(BaseModel):
     nombre: str
 
 
+def _ejecutar(consulta):
+    """Ejecuta una consulta a Supabase y convierte cualquier fallo (RLS,
+    red, lo que sea) en un HTTPException normal.
+
+    Si se deja que la excepción de Supabase se propague tal cual, FastAPI
+    responde con un error 500 que se salta la capa de CORSMiddleware, así
+    que el navegador lo ve como "bloqueado por CORS" en vez de mostrar el
+    error real. Pasándolo por HTTPException, la respuesta sí lleva las
+    cabeceras CORS y el error real llega hasta la app.
+    """
+    try:
+        return consulta.execute()
+    except Exception as error:
+        raise HTTPException(status_code=502, detail=str(error)) from error
+
+
 @app.get("/plazas")
 def listar_plazas():
-    respuesta = supabase.table("plazas").select("*").order("id").execute()
+    respuesta = _ejecutar(supabase.table("plazas").select("*").order("id"))
     return respuesta.data
 
 
 @app.put("/plazas/{plaza_id}/ocupar")
 def ocupar_plaza(plaza_id: int, body: OcuparBody):
-    respuesta = (
+    respuesta = _ejecutar(
         supabase.table("plazas")
         .update({"ocupada": True, "ocupado_por": body.nombre})
         .eq("id", plaza_id)
-        .execute()
     )
     if not respuesta.data:
         raise HTTPException(status_code=404, detail="Plaza no encontrada")
@@ -49,11 +64,10 @@ def ocupar_plaza(plaza_id: int, body: OcuparBody):
 
 @app.put("/plazas/{plaza_id}/liberar")
 def liberar_plaza(plaza_id: int):
-    respuesta = (
+    respuesta = _ejecutar(
         supabase.table("plazas")
         .update({"ocupada": False, "ocupado_por": None})
         .eq("id", plaza_id)
-        .execute()
     )
     if not respuesta.data:
         raise HTTPException(status_code=404, detail="Plaza no encontrada")

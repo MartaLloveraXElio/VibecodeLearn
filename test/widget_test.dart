@@ -1,18 +1,49 @@
-// Test básico de la app de reserva de plazas de garaje.
+// Test de la app de reserva de plazas de garaje.
 //
-// Comprueba el flujo principal: una plaza libre se puede reservar
-// introduciendo un nombre, y una plaza ocupada se libera al pulsarla.
+// La pantalla ya no guarda el estado en memoria: lo pide a la API real.
+// Para probarla sin depender de la red, se sustituye el cliente HTTP por
+// un MockClient que simula las respuestas del backend.
+
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 
+import 'package:vibecode_garage/garage_api.dart';
 import 'package:vibecode_garage/main.dart';
 
+Map<String, dynamic> _plaza(int id, {String? ocupadoPor}) => {
+  'id': id,
+  'nombre': 'P$id',
+  'ocupada': ocupadoPor != null,
+  'ocupado_por': ocupadoPor,
+  'created_at': '2026-01-01T00:00:00Z',
+};
+
 void main() {
-  testWidgets('reservar y liberar una plaza de garaje', (
+  testWidgets('carga las plazas, reserva P1 y luego la libera', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const GarageBookingApp());
+    final client = MockClient((request) async {
+      if (request.method == 'GET' && request.url.path == '/plazas') {
+        final plazas = List.generate(5, (i) => _plaza(i + 1));
+        return http.Response(jsonEncode(plazas), 200);
+      }
+      if (request.method == 'PUT' && request.url.path == '/plazas/1/ocupar') {
+        final nombre = jsonDecode(request.body)['nombre'] as String;
+        return http.Response(jsonEncode(_plaza(1, ocupadoPor: nombre)), 200);
+      }
+      if (request.method == 'PUT' &&
+          request.url.path == '/plazas/1/liberar') {
+        return http.Response(jsonEncode(_plaza(1)), 200);
+      }
+      return http.Response('No encontrado', 404);
+    });
+
+    await tester.pumpWidget(GarageBookingApp(api: GarageApi(client: client)));
+    await tester.pumpAndSettle();
 
     // Al principio todas las plazas están libres.
     expect(find.text('Libre'), findsNWidgets(5));
